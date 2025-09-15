@@ -1,0 +1,3172 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>طقس موقعك الحالي</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(to bottom, #1c1c3c, #2e2e50);
+            color: #fff;
+            direction: rtl;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            transition: background 0.5s ease;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            padding: 20px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 1.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 70%;
+        }
+        
+        /* البحث عن مدن */
+        .search-container {
+            display: flex;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        #city-search {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-family: 'Cairo', sans-serif;
+        }
+        
+        #search-btn {
+            padding: 10px 15px;
+            margin-right: 10px;
+            border: none;
+            border-radius: 10px;
+            background: #4cc9f0;
+            color: white;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+        }
+        
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(30, 30, 60, 0.95);
+            border-radius: 10px;
+            margin-top: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+        }
+        
+        .search-result-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .search-result-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* وضع ليلي/نهاري */
+        #theme-toggle {
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+        
+        .light-theme {
+            background: linear-gradient(to bottom, #a1c4fd, #c2e9fb) !important;
+            color: #333 !important;
+        }
+        
+        .light-theme .container {
+            background: rgba(255, 255, 255, 0.7) !important;
+            color: #333 !important;
+        }
+        
+        .light-theme .hour, 
+        .light-theme .hourly-item,
+        .light-theme .daily-item {
+            background: rgba(255, 255, 255, 0.5) !important;
+            color: #333 !important;
+        }
+        
+        .temperature {
+            font-size: 4rem;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .condition {
+            text-align: center;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+        .details {
+            text-align: center;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+        
+        /* مؤشر الأشعة فوق البنفسجية وجودة الهواء */
+        .detail-item {
+            margin: 5px 0;
+        }
+        
+        .forecast-hours {
+            display: flex;
+            justify-content: space-between;
+            overflow-x: auto;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            gap: 10px;
+        }
+        .hour {
+            flex: 0 0 auto;
+            text-align: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            min-width: 80px;
+        }
+        .hour img {
+            width: 30px;
+            height: 30px;
+            margin: 5px 0;
+        }
+        .graph {
+            width: 100%;
+            height: 150px;
+            margin-bottom: 20px;
+        }
+        .loading {
+            text-align: center;
+            font-size: 1.2rem;
+            margin: 20px 0;
+        }
+        .error {
+            text-align: center;
+            color: #ff6b6b;
+            margin: 15px 0;
+            display: none;
+        }
+        .retry-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px auto;
+            display: block;
+            font-family: 'Cairo', sans-serif;
+        }
+        
+        /* تنسيقات التبويبات والتوقعات */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .tab-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+            font-size: 0.9rem;
+            opacity: 0.7;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-btn.active {
+            opacity: 1;
+            border-bottom: 2px solid #4cc9f0;
+        }
+        
+        .forecast-container {
+            margin-bottom: 20px;
+            min-height: 200px;
+        }
+        
+        .hourly-forecast {
+            display: flex;
+            overflow-x: auto;
+            padding: 10px 0;
+            gap: 10px;
+        }
+        
+        .hourly-item {
+            flex: 0 0 auto;
+            text-align: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            min-width: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .daily-forecast {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .daily-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+        }
+        
+        .daily-temp {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .temp-range {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        
+        .max-temp {
+            font-weight: bold;
+        }
+        
+        .min-temp {
+            opacity: 0.7;
+            font-size: 0.9rem;
+        }
+        
+        /* تأثيرات الطقس */
+        .weather-animation {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        /* الإعدادات */
+        #settings-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.2rem;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: #2e2e50;
+            padding: 20px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        .setting-item {
+            margin: 15px 0;
+        }
+        
+        .setting-item label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .setting-item select {
+            width: 100%;
+            padding: 8px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+        }
+        
+        #save-settings, #close-settings {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+        }
+        
+        #save-settings {
+            background: #4cc9f0;
+            color: white;
+        }
+        
+        /* تكامل التقويم والساعة */
+        .calendar-integration {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        
+        /* تحسينات للشاشات الصغيرة */
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            .header h1 {
+                font-size: 1rem;
+            }
+            .temperature {
+                font-size: 3rem;
+            }
+            .hour {
+                min-width: 70px;
+                padding: 8px;
+            }
+            .hour img {
+                width: 25px;
+                height: 25px;
+            }
+            .tab-btn {
+                padding: 8px 10px;
+                font-size: 0.8rem;
+            }
+            .hourly-item {
+                min-width: 70px;
+                padding: 8px;
+            }
+            .daily-item {
+                padding: 8px 10px;
+            }
+            .search-container {
+                flex-direction: column;
+            }
+            
+            #search-btn {
+                margin: 10px 0;
+            }
+            
+            .modal-content {
+                width: 95%;
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- بحث عن المدن -->
+        <div class="search-container">
+            <input type="text" id="city-search" placeholder="ابحث عن مدينة...">
+            <button id="search-btn">بحث</button>
+            <div id="search-results" class="search-results"></div>
+        </div>
+
+        <div class="header">
+            <h1 id="location">جاري تحديد الموقع...</h1>
+            <button id="theme-toggle">🌙</button>
+            <button id="settings-btn">⚙️</button>
+        </div>
+
+        <div class="loading" id="loading">جاري جلب بيانات الطقس...</div>
+        <div class="error" id="error"></div>
+        <button class="retry-btn" id="retry-btn" style="display: none;" onclick="getWeather()">إعادة المحاولة</button>
+        
+        <div class="temperature" id="temp" style="display: none;">--°</div>
+        <div class="condition" id="condition" style="display: none;">--</div>
+        <div class="details" id="details" style="display: none;">
+            <div id="humidity">الرطوبة: --%</div>
+            <div id="wind">الرياح: -- كم/س</div>
+            <div id="uv-index" class="detail-item">مؤشر الأشعة فوق البنفسجية: --</div>
+            <div id="air-quality" class="detail-item">جودة الهواء: --</div>
+            <div id="astronomy" class="detail-item">الشروق: -- | الغروب: --</div>
+        </div>
+
+        <!-- توقعات الساعات والأيام -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="hourly">توقعات بالساعات</button>
+            <button class="tab-btn" data-tab="daily">توقعات بالأيام</button>
+        </div>
+        <div class="forecast-container" id="forecast-container"></div>
+
+        <canvas id="weatherChart" class="graph" style="display: none;"></canvas>
+    </div>
+
+    <!-- نافذة الإعدادات -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <h2>الإعدادات</h2>
+            <div class="setting-item">
+                <label>وحدة الحرارة:</label>
+                <select id="temp-unit">
+                    <option value="celsius">مئوية (°C)</option>
+                    <option value="fahrenheit">فهرنهايت (°F)</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <label>وحدة السرعة:</label>
+                <select id="speed-unit">
+                    <option value="kmh">كم/س</option>
+                    <option value="mph">ميل/س</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <label>اللغة:</label>
+                <select id="language">
+                    <option value="ar">العربية</option>
+                    <option value="en">English</option>
+                    <option value="fr">Français</option>
+                </select>
+            </div>
+            <button id="save-settings">حفظ</button>
+            <button id="close-settings">إلغاء</button>
+        </div>
+    </div>
+
+    <script>
+    // خريطة رموز الطقس WMO إلى وصف عربي وأيقونة
+    const weatherMap = {
+        0: { desc: 'سماء صافية', icon: '☀️' },
+        1: { desc: 'غالباً صافية', icon: '🌤' },
+        2: { desc: 'جزئياً ملبدة بالغيوم', icon: '⛅' },
+        3: { desc: 'ملبدة بالغيوم', icon: '☁️' },
+        45: { desc: 'ضباب', icon: '🌫' },
+        48: { desc: 'ضباب متجمد', icon: '🌫' },
+        51: { desc: 'رذاذ خفيف', icon: '🌧' },
+        53: { desc: 'رذاذ', icon: '🌧' },
+        55: { desc: 'رذاذ كثيف', icon: '🌧' },
+        56: { desc: 'رذاذ متجمد خفيف', icon: '🌧' },
+        57: { desc: 'رذاذ متجمد كثيف', icon: '🌧' },
+        61: { desc: 'مطر خفيف', icon: '🌧' },
+        63: { desc: 'مطر', icon: '🌧' },
+        65: { desc: 'مطر شديد', icon: '🌧' },
+        66: { desc: 'مطر متجمد خفيف', icon: '🌧' },
+        67: { desc: 'مطر متجمد شديد', icon: '🌧' },
+        71: { desc: 'ثلوج خفيفة', icon: '❄️' },
+        73: { desc: 'ثلوج', icon: '❄️' },
+        75: { desc: 'ثلوج شديدة', icon: '❄️' },
+        77: { desc: 'حبيبات ثلج', icon: '❄️' },
+        80: { desc: 'زخات مطر خفيفة', icon: '🌦' },
+        81: { desc: 'زخات مطر', icon: '🌦' },
+        82: { desc: 'زخات مطر شديدة', icon: '🌦' },
+        85: { desc: 'زخات ثلج خفيفة', icon: '🌨' },
+        86: { desc: 'زخات ثلج شديدة', icon: '🌨' },
+        95: { desc: 'عاصفة رعدية', icon: '⛈' },
+        96: { desc: 'عاصفة رعدية مع برد', icon: '⛈' },
+        99: { desc: 'عاصفة رعدية مع برد شديد', icon: '⛈' }
+    };
+
+    // دالة للحصول على وصف وأيقونة من كود الطقس
+    function getWeatherDescription(code) {
+        return weatherMap[code] || { desc: 'غير معروف', icon: '❓' };
+    }
+
+    // عناصر واجهة المستخدم
+    const loadingElement = document.getElementById('loading');
+    const errorElement = document.getElementById('error');
+    const retryBtn = document.getElementById('retry-btn');
+    const tempElement = document.getElementById('temp');
+    const conditionElement = document.getElementById('condition');
+    const detailsElement = document.getElementById('details');
+    const forecastContainer = document.getElementById('forecast-container');
+    const chartCanvas = document.getElementById('weatherChart');
+    const locationElement = document.getElementById('location');
+
+    // التحقق من حالة الاتصال بالإنترنت
+    function checkOnlineStatus() {
+        if (!navigator.onLine) {
+            showError('أنت غير متصل بالإنترنت. يرجى التحقق من اتصالك ثم إعادة المحاولة.');
+            return false;
+        }
+        return true;
+    }
+
+    // عرض رسالة الخطأ
+    function showError(message) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+        retryBtn.style.display = 'block';
+        loadingElement.style.display = 'none';
+        
+        // إخفاء عناصر الطقس في حالة الخطأ
+        tempElement.style.display = 'none';
+        conditionElement.style.display = 'none';
+        detailsElement.style.display = 'none';
+        forecastContainer.style.display = 'none';
+        chartCanvas.style.display = 'none';
+    }
+
+    // إخفاء رسالة الخطأ
+    function hideError() {
+        errorElement.style.display = 'none';
+        retryBtn.style.display = 'none';
+    }
+
+    // دالة لجلب بيانات الطقس من Open Meteo
+    async function fetchWeatherData(latitude, longitude) {
+        try {
+            const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,showers,snowfall,snow_depth,weather_code,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,sunshine_duration,precipitation_sum,precipitation_hours,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,uv_index_max&timezone=auto&forecast_days=16`);
+            
+            if (!response.ok) {
+                throw new Error(`خطأ في استجابة API: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('فشل في جلب بيانات الطقس:', error);
+            throw error;
+        }
+    }
+
+    // دالة لتنسيق بيانات الطقس الحالية
+    function formatCurrentWeather(data) {
+        if (!data || !data.current) return null;
+        
+        const current = data.current;
+        const weatherInfo = getWeatherDescription(current.weather_code);
+        
+        return {
+            temperature: Math.round(current.temperature_2m),
+            apparentTemperature: Math.round(current.apparent_temperature),
+            humidity: current.relative_humidity_2m,
+            windSpeed: Math.round(current.wind_speed_10m),
+            windDirection: current.wind_direction_10m,
+            pressure: Math.round(current.pressure_msl),
+            weatherDescription: weatherInfo.desc,
+            weatherIcon: weatherInfo.icon,
+            isDay: current.is_day === 1,
+            uvIndex: current.uv_index
+        };
+    }
+
+    // دالة لعرض توقعات الساعات
+    function displayHourlyForecast(hourlyData) {
+        const forecastContainer = document.getElementById('forecast-container');
+        forecastContainer.innerHTML = '';
+        
+        const hourlyDiv = document.createElement('div');
+        hourlyDiv.className = 'hourly-forecast';
+        // عرض توقعات الـ 24 ساعة القادمة
+        for (let i = 0; i < Math.min(24, hourlyData.time.length); i++) {
+            const time = new Date(hourlyData.time[i]);
+            const hour = time.getHours();
+            const isDay = hour > 6 && hour < 18;
+            
+            const weatherInfo = getWeatherDescription(hourlyData.weather_code[i]);
+            
+            const hourItem = document.createElement('div');
+            hourItem.className = 'hourly-item';
+            hourItem.innerHTML = `
+                <div>${time.toLocaleTimeString('ar-SA', { hour: '2-digit' })}</div>
+                <div style="font-size: 1.5rem;">${weatherInfo.icon}</div>
+                <div>${Math.round(hourlyData.temperature_2m[i])}°</div>
+                <div style="font-size: 0.7rem; margin-top: 5px;">${hourlyData.precipitation_probability[i]}%</div>
+            `;
+            
+            hourlyDiv.appendChild(hourItem);
+        }
+        
+        forecastContainer.appendChild(hourlyDiv);
+    }
+
+    // دالة لعرض توقعات الأيام
+    function displayDailyForecast(dailyData) {
+        const forecastContainer = document.getElementById('forecast-container');
+        forecastContainer.innerHTML = '';
+        
+        const dailyDiv = document.createElement('div');
+        dailyDiv.className = 'daily-forecast';
+        
+        // عرض توقعات الـ 7 أيام القادمة
+        for (let i = 0; i < Math.min(7, dailyData.time.length); i++) {
+            const date = new Date(dailyData.time[i]);
+            const weatherInfo = getWeatherDescription(dailyData.weather_code[i]);
+            
+            const dayItem = document.createElement('div');
+            dayItem.className = 'daily-item';
+            dayItem.innerHTML = `
+                <div>${date.toLocaleDateString('ar-SA', { weekday: 'long' })}</div>
+                <div style="font-size: 1.5rem;">${weatherInfo.icon}</div>
+                <div class="daily-temp">
+                    <div class="temp-range">
+                        <span class="max-temp">${Math.round(dailyData.temperature_2m_max[i])}°</span>
+                        <span class="min-temp">${Math.round(dailyData.temperature_2m_min[i])}°</span>
+                    </div>
+                </div>
+            `;
+            
+            dailyDiv.appendChild(dayItem);
+        }
+        
+        forecastContainer.appendChild(dailyDiv);
+    }
+
+    // دالة لعرض بيانات الطقس في واجهة المستخدم
+    function displayWeatherData(weatherData, airQualityData = null) {
+        if (!weatherData) return;
+        
+        // حفظ البيانات للتبويبات
+        window.hourlyData = weatherData.hourly;
+        window.dailyData = weatherData.daily;
+        
+        // عرض بيانات الطقس الحالية
+        const currentWeather = formatCurrentWeather(weatherData);
+        if (currentWeather) {
+            tempElement.textContent = `${currentWeather.temperature}°C`;
+            conditionElement.textContent = currentWeather.weatherDescription;
+            document.getElementById('humidity').textContent = `الرطوبة: ${currentWeather.humidity}%`;
+            document.getElementById('wind').textContent = `الرياح: ${currentWeather.windSpeed} كم/س`;
+            
+            // عرض مؤشر الأشعة فوق البنفسجية
+            const uvIndex = currentWeather.uvIndex;
+            document.getElementById('uv-index').textContent = `مؤشر الأشعة فوق البنفسجية: ${uvIndex} ${getUVIndexLevel(uvIndex)}`;
+            
+            // عرض جودة الهواء إذا كانت متاحة
+            if (airQualityData && airQualityData.current) {
+                const aqi = airQualityData.current.us_aqi;
+                document.getElementById('air-quality').textContent = `جودة الهواء: ${aqi} ${getAQILevel(aqi)}`;
+            } else {
+                document.getElementById('air-quality').textContent = 'جودة الهواء: غير متاح';
+            }
+            
+            // عرض التفاصيل الفلكية
+            if (weatherData.daily) {
+                document.getElementById('astronomy').textContent = `الشروق: ${formatTime(weatherData.daily.sunrise[0])} | الغروب: ${formatTime(weatherData.daily.sunset[0])}`;
+            }
+            
+            // إظهار العناصر بعد تحميل البيانات
+            tempElement.style.display = 'block';
+            conditionElement.style.display = 'block';
+            detailsElement.style.display = 'block';
+        }
+        
+        // عرض توقعات الساعات افتراضيًا
+        displayHourlyForecast(weatherData.hourly);
+        
+        // إخفاء رسالة التحميل
+        loadingElement.style.display = 'none';
+        
+        // إظهار عنصر التبويبات والحاوية
+        document.querySelector('.tabs').style.display = 'flex';
+        forecastContainer.style.display = 'block';
+    }
+
+    // وظائف مساعدة جديدة
+    function getUVIndexLevel(uvIndex) {
+        if (uvIndex <= 2) return '(منخفض)';
+        if (uvIndex <= 5) return '(متوسط)';
+        if (uvIndex <= 7) return '(مرتفع)';
+        if (uvIndex <= 10) return '(مرتفع جداً)';
+        return '(خطير)';
+    }
+
+    function getAQILevel(aqi) {
+        if (aqi <= 50) return '(جيد)';
+        if (aqi <= 100) return '(معتدل)';
+        if (aqi <= 150) return '(غير صحي للحساسية)';
+        if (aqi <= 200) return '(غير صحي)';
+        if (aqi <= 300) return '(غير صحي جداً)';
+        return '(خطير)';
+    }
+
+    function formatTime(timeString) {
+        return new Date(timeString).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // إضافة أحداث النقر لأزرار التبويب
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const tab = btn.getAttribute('data-tab');
+            if (tab === 'hourly' && window.hourlyData) {
+                displayHourlyForecast(window.hourlyData);
+            } else if (tab === 'daily' && window.dailyData) {
+                displayDailyForecast(window.dailyData);
+            }
+        });
+    });
+
+    // جلب موقع المستخدم باستخدام Geolocation API
+    async function getWeather() {
+        // إخفاء رسائل الخطأ السابقة
+        hideError();
+        
+        // التحقق من الاتصال بالإنترنت
+        if (!checkOnlineStatus()) {
+            return;
+        }
+
+        loadingElement.style.display = 'block';
+        loadingElement.textContent = 'جاري تحديد الموقع...';
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const { latitude, longitude } = position.coords;
+                    
+                    // استخدام خدمة Geocoding للحصول على اسم الموقع
+                    try {
+                        const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=ar`);
+                        const locationData = await response.json();
+                        locationElement.textContent = locationData.city || locationData.locality || `الموقع: ${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
+                    } catch (error) {
+                        locationElement.textContent = `الموقع: ${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
+                    }
+                    
+                    try {
+                        loadingElement.textContent = 'جاري جلب بيانات الطقس...';
+                        const weatherData = await fetchWeatherData(latitude, longitude);
+                        
+                        // جلب بيانات جودة الهواء
+                        const airQualityResponse = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=us_aqi,pm10,pm2_5`);
+                        const airQualityData = await airQualityResponse.ok ? await airQualityResponse.json() : null;
+                        
+                        displayWeatherData(weatherData, airQualityData);
+                    } catch (error) {
+                        showError('فشل في جلب بيانات الطقس. تحقق من الاتصال بالإنترنت.');
+                        console.error('API Error:', error);
+                    }
+                },
+                (error) => {
+                    let errorMessage = 'فشل تحديد الموقع.';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage = 'تم رفض الإذن بالوصول إلى الموقع. يرجى السماح بالوصول إلى الموقع في إعدادات المتصفح.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage = 'معلومات الموقع غير متاحة.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage = 'انتهت مهلة طلب الموقع.';
+                            break;
+                    }
+                    showError(errorMessage);
+                    console.error('Geolocation Error:', error);
+                    
+                    // استخدام موقع افتراضي في حالة رفض إذن الموقع
+                    const defaultLat = 24.7136;
+                    const defaultLon = 46.6753;
+                    locationElement.textContent = 'الرياض, السعودية';
+                    
+                    fetchWeatherData(defaultLat, defaultLon)
+                        .then(weatherData => displayWeatherData(weatherData))
+                        .catch(err => {
+                            showError('فشل في جلب بيانات الطقس. تحقق من الاتصال بالإنترنت.');
+                            console.error('API Error:', err);
+                        });
+                },
+                { timeout: 10000 } // زيادة وقت الانتظار إلى 10 ثوان
+            );
+        } else {
+            showError('المتصفح لا يدعم تحديد الموقع.');
+        }
+    }
+
+    // البحث عن المدن
+    const citySearch = document.getElementById('city-search');
+    const searchBtn = document.getElementById('search-btn');
+    const searchResults = document.getElementById('search-results');
+
+    searchBtn.addEventListener('click', searchCity);
+    citySearch.addEventListener('input', debounce(searchCity, 300));
+
+    async function searchCity() {
+        const query = citySearch.value.trim();
+        if (query.length < 2) {
+            searchResults.style.display = 'none';
+            return;
+        }
+        
+        try {
+            const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${query}&count=5&language=ar`);
+            const data = await response.json();
+            
+            if (data.results && data.results.length > 0) {
+                searchResults.innerHTML = '';
+                data.results.forEach(city => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.textContent = `${city.name}, ${city.country}`;
+                    item.addEventListener('click', () => {
+                        getWeatherByCoords(city.latitude, city.longitude, city.name);
+                        citySearch.value = '';
+                        searchResults.style.display = 'none';
+                    });
+                    searchResults.appendChild(item);
+                });
+                searchResults.style.display = 'block';
+            } else {
+                searchResults.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error searching city:', error);
+        }
+    }
+
+    // وظيفة debounce للبحث
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // الحصول على الطقس بالإحداثيات
+    async function getWeatherByCoords(lat, lon, cityName = null) {
+        try {
+            loadingElement.textContent = 'جاري جلب بيانات الطقس...';
+            const weatherData = await fetchWeatherData(lat, lon);
+            
+            // جلب بيانات جودة الهواء
+            const airQualityResponse = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5`);
+            const airQualityData = await airQualityResponse.ok ? await airQualityResponse.json() : null;
+            
+            // تحديث واجهة المستخدم
+            if (cityName) {
+                locationElement.textContent = cityName;
+            }
+            
+            displayWeatherData(weatherData, airQualityData);
+            
+        } catch (error) {
+            showError('فشل في جلب بيانات الطقس. تحقق من الاتصال بالإنترنت.');
+            console.error('API Error:', error);
+        }
+    }
+
+    // أحداث الاستماع لتغير حالة الاتصال
+    window.addEventListener('online', () => {
+        if (errorElement.style.display === 'block') {
+            getWeather();
+        }
+    });
+
+    window.addEventListener('offline', () => {
+        showError('أنت غير متصل بالإنترنت. يرجى التحقق من اتصالك ثم إعادة المحاولة.');
+    });
+
+    // استدعاء الوظيفة عند تحميل الصفحة
+    window.addEventListener('load', getWeather);
+
+    // تحديث بيانات الطقس كل 30 دقيقة
+    setInterval(getWeather, 30 * 60 * 1000);
+
+    // ==============================================
+    // إعدادات المستخدم والإدارة
+    // ==============================================
+    
+    // بيانات إعدادات المستخدم
+    const userSettings = {
+        tempUnit: localStorage.getItem('tempUnit') || 'celsius',
+        speedUnit: localStorage.getItem('speedUnit') || 'kmh',
+        language: localStorage.getItem('language') || 'ar',
+        theme: localStorage.getItem('theme') || 'dark'
+    };
+
+    // تطبيق الإعدادات عند تحميل الصفحة
+    function applySettings() {
+        // تطبيق السمة
+        document.body.classList.toggle('light-theme', userSettings.theme === 'light');
+        
+        // تطبيق اللغة
+        document.documentElement.lang = userSettings.language;
+        
+        // تحديث واجهة المستخدم بناءً على الإعدادات
+        updateUIForSettings();
+    }
+
+    // تحديث واجهة المستخدم بناءً على الإعدادات
+    function updateUIForSettings() {
+        // تحديث وحدة الحرارة
+        const tempElements = document.querySelectorAll('.temperature, .max-temp, .min-temp, .hourly-item > div:nth-child(3)');
+        tempElements.forEach(el => {
+            if (el.textContent.includes('°')) {
+                const temp = parseInt(el.textContent);
+                if (!isNaN(temp)) {
+                    if (userSettings.tempUnit === 'fahrenheit') {
+                        const fahrenheit = Math.round((temp * 9/5) + 32);
+                        el.textContent = `${fahrenheit}°F`;
+                    } else {
+                        el.textContent = `${temp}°C`;
+                    }
+                }
+            }
+        });
+        
+        // تحديث وحدة السرعة
+        const windElement = document.getElementById('wind');
+        if (windElement) {
+            const windText = windElement.textContent;
+            const windSpeed = parseInt(windText.match(/\d+/)[0]);
+            if (!isNaN(windSpeed)) {
+                if (userSettings.speedUnit === 'mph') {
+                    const mph = Math.round(windSpeed * 0.621371);
+                    windElement.textContent = windText.replace(/\d+ كم\/س/, `${mph} ميل/س`);
+                } else {
+                    windElement.textContent = windText.replace(/\d+ ميل\/س/, `${windSpeed} كم/س`);
+                }
+            }
+        }
+    }
+
+    // إدارة نافذة الإعدادات
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsBtn = document.getElementById('settings-btn');
+    const saveSettingsBtn = document.getElementById('save-settings');
+    const closeSettingsBtn = document.getElementById('close-settings');
+    const themeToggleBtn = document.getElementById('theme-toggle');
+
+    // فتح نافذة الإعدادات
+    settingsBtn.addEventListener('click', () => {
+        // تعبئة النماذج بالقيم الحالية
+        document.getElementById('temp-unit').value = userSettings.tempUnit;
+        document.getElementById('speed-unit').value = userSettings.speedUnit;
+        document.getElementById('language').value = userSettings.language;
+        
+        settingsModal.style.display = 'flex';
+    });
+
+    // حفظ الإعدادات
+    saveSettingsBtn.addEventListener('click', () => {
+        userSettings.tempUnit = document.getElementById('temp-unit').value;
+        userSettings.speedUnit = document.getElementById('speed-unit').value;
+        userSettings.language = document.getElementById('language').value;
+        
+        // حفظ الإعدادات في localStorage
+        localStorage.setItem('tempUnit', userSettings.tempUnit);
+        localStorage.setItem('speedUnit', userSettings.speedUnit);
+        localStorage.setItem('language', userSettings.language);
+        localStorage.setItem('theme', userSettings.theme);
+        
+        // تطبيق الإعدادات الجديدة
+        applySettings();
+        
+        // إغلاق النافذة
+        settingsModal.style.display = 'none';
+    });
+
+    // إغلاق نافذة الإعدادات
+    closeSettingsBtn.addEventListener('click', () => {
+        settingsModal.style.display = 'none';
+    });
+
+    // تبديل السمة (ليلي/نهاري)
+    themeToggleBtn.addEventListener('click', () => {
+        userSettings.theme = userSettings.theme === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('theme', userSettings.theme);
+        applySettings();
+        
+        // تحديث رمز الزر
+        themeToggleBtn.textContent = userSettings.theme === 'dark' ? '🌙' : '☀️';
+    });
+
+    // تطبيق الإعدادات عند تحميل الصفحة
+    document.addEventListener('DOMContentLoaded', applySettings);
+    // ==============================================
+// الميزات الإضافية - الجزء الثاني
+// ==============================================
+
+// 1. التكامل مع التقويم والساعة
+function setupCalendarIntegration() {
+    // تحديث الوقت الحالي في الواجهة
+    function updateCurrentTime() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('ar-SA', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
+        });
+        
+        // إضافة الوقت إلى العنوان إذا لم يكن موجودًا
+        if (!document.getElementById('current-time')) {
+            const timeElement = document.createElement('div');
+            timeElement.id = 'current-time';
+            timeElement.style.fontSize = '0.8rem';
+            timeElement.style.opacity = '0.7';
+            timeElement.style.marginTop = '5px';
+            document.querySelector('.header').appendChild(timeElement);
+        }
+        
+        document.getElementById('current-time').textContent = timeString;
+    }
+    
+    // تحديث الوقت كل دقيقة
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 60000);
+}
+
+// 2. وضع عدم الاتصال (التخزين المؤقت)
+function setupOfflineMode() {
+    // حفظ بيانات الطقس محليًا
+    function cacheWeatherData(data, location) {
+        const cacheData = {
+            data: data,
+            location: location,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('weatherCache', JSON.stringify(cacheData));
+    }
+    
+    // محاولة تحميل البيانات المخزنة محليًا
+    function tryLoadCachedData() {
+        const cachedData = localStorage.getItem('weatherCache');
+        if (cachedData) {
+            const { data, location, timestamp } = JSON.parse(cachedData);
+            // إذا كانت البيانات أقل من ساعة قديمة
+            if (Date.now() - timestamp < 3600000) {
+                locationElement.textContent = location + ' (بيانات مخزنة)';
+                displayWeatherData(data);
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // تعديل دالة getWeather لدعم وضع عدم الاتصال
+    const originalGetWeather = window.getWeather;
+    window.getWeather = function() {
+        if (!navigator.onLine) {
+            if (tryLoadCachedData()) {
+                return;
+            } else {
+                showError('أنت غير متصل بالإنترنت ولا توجد بيانات مخزنة.');
+                return;
+            }
+        }
+        originalGetWeather();
+    };
+    
+    // تعديل دالة displayWeatherData لحفظ البيانات
+    const originalDisplayWeatherData = window.displayWeatherData;
+    window.displayWeatherData = function(weatherData, airQualityData) {
+        originalDisplayWeatherData(weatherData, airQualityData);
+        cacheWeatherData(weatherData, locationElement.textContent);
+    };
+}
+
+// 3. الرسوم المتحركة والتفاعلية
+function addWeatherAnimations() {
+    // إضافة تأثيرات حسب حالة الطقس
+    function createWeatherAnimation(weatherCode, isDay) {
+        const animationContainer = document.createElement('div');
+        animationContainer.className = 'weather-animation';
+        
+        // تأثيرات مختلفة حسب حالة الطقس
+        if (weatherCode === 0) {
+            // صافي - إضافة أشعة شمس
+            if (isDay) {
+                animationContainer.innerHTML = `
+                    <div class="sun-rays"></div>
+                `;
+                const style = document.createElement('style');
+                style.textContent = `
+                    .sun-rays {
+                        position: absolute;
+                        top: 20px;
+                        right: 20px;
+                        width: 50px;
+                        height: 50px;
+                        background: radial-gradient(circle, #ffde65 0%, transparent 70%);
+                        border-radius: 50%;
+                        animation: pulse 3s infinite alternate;
+                    }
+                    
+                    @keyframes pulse {
+                        0% { opacity: 0.6; transform: scale(1); }
+                        100% { opacity: 1; transform: scale(1.1); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        } else if (weatherCode >= 51 && weatherCode <= 67) {
+            // مطر - إضافة تأثير مطر
+            animationContainer.innerHTML = `
+                <div class="rain"></div>
+            `;
+            const style = document.createElement('style');
+            style.textContent = `
+                .rain {
+                    position: absolute;
+                    width: 100%;
+                    height: 100%;
+                    overflow: hidden;
+                }
+                
+                .rain:before {
+                    content: '';
+                    position: absolute;
+                    width: 100%;
+                    height: 100%;
+                    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cline x1='30' y1='0' x2='30' y2='15' stroke='%23a1c6ff' stroke-width='1'/%3E%3Cline x1='50' y1='0' x2='50' y2='15' stroke='%23a1c6ff' stroke-width='1'/%3E%3Cline x1='70' y1='0' x2='70' y2='15' stroke='%23a1c6ff' stroke-width='1'/%3E%3C/svg%3E") repeat;
+                    animation: rainFall 1s linear infinite;
+                    opacity: 0.3;
+                }
+                
+                @keyframes rainFall {
+                    0% { transform: translateY(-100px); }
+                    100% { transform: translateY(100px); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        return animationContainer;
+    }
+    
+    // تعديل دالة displayWeatherData لإضافة الرسوم المتحركة
+    const originalDisplayWeatherData = window.displayWeatherData;
+    window.displayWeatherData = function(weatherData, airQualityData) {
+        // إزالة أي تأثيرات سابقة
+        const existingAnimations = document.querySelectorAll('.weather-animation');
+        existingAnimations.forEach(el => el.remove());
+        
+        // إضافة تأثيرات جديدة
+        const weatherCode = weatherData.current.weather_code;
+        const isDay = weatherData.current.is_day === 1;
+        const animation = createWeatherAnimation(weatherCode, isDay);
+        document.body.appendChild(animation);
+        
+        // استدعاء الدالة الأصلية
+        originalDisplayWeatherData(weatherData, airQualityData);
+    };
+}
+
+// 4. تحسينات إضافية
+function addPerformanceOptimizations() {
+    // إضافة تأثيرات تحميل سلسة
+    const originalShowError = window.showError;
+    window.showError = function(message) {
+        document.querySelector('.container').style.opacity = '0.7';
+        originalShowError(message);
+    };
+    
+    const originalHideError = window.hideError;
+    window.hideError = function() {
+        document.querySelector('.container').style.opacity = '1';
+        originalHideError();
+    };
+}
+
+// تهيئة جميع الميزات الإضافية
+function initializeAdditionalFeatures() {
+    setupCalendarIntegration();
+    setupOfflineMode();
+    addWeatherAnimations();
+    addPerformanceOptimizations();
+    
+    // إضافة تحسينات للوحة المفاتيح على mobile
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && document.getElementById('city-search') === document.activeElement) {
+            searchCity();
+        }
+    });
+}
+
+// استدعاء التهيئة عند تحميل الصفحة
+window.addEventListener('load', initializeAdditionalFeatures);
+
+// ======= الميزات الإضافية =======
+
+// 1. التنبيهات الجوية
+function checkWeatherAlerts(weatherData) {
+    const alerts = [];
+    const current = weatherData.current;
+    
+    // تحقق من الظروف الخطرة
+    if (current.uv_index >= 8) {
+        alerts.push({
+            type: 'uv',
+            message: 'تحذير: الأشعة فوق البنفسجية مرتفعة جداً. يرجى استخدام واقي الشمس',
+            severity: 'high'
+        });
+    }
+    
+    if (current.wind_speed_10m >= 30) {
+        alerts.push({
+            type: 'wind',
+            message: 'تحذير: سرعة الرياح عالية. كن حذراً عند الخروج',
+            severity: 'medium'
+        });
+    }
+    
+    if (current.temperature_2m >= 35) {
+        alerts.push({
+            type: 'heat',
+            message: 'تحذير: درجة حرارة مرتفعة جداً. تجنب التعرض المباشر للشمس',
+            severity: 'high'
+        });
+    }
+    
+    if (current.temperature_2m <= 0) {
+        alerts.push({
+            type: 'cold',
+            message: 'تحذير: درجة حرارة منخفضة جداً. ارتدِ ملابس دافئة',
+            severity: 'medium'
+        });
+    }
+    
+    return alerts;
+}
+
+// 2. خلفيات ديناميكية حسب حالة الطقس
+function updateBackground(weatherCode, isDay) {
+    const body = document.body;
+    
+    // إزالة أي خلفيات سابقة
+    body.classList.remove('weather-sunny', 'weather-cloudy', 'weather-rainy', 'weather-stormy', 'weather-snowy');
+    
+    // إضافة الخلفية المناسبة
+    if (weatherCode === 0) {
+        body.classList.add(isDay ? 'weather-sunny' : 'weather-night');
+    } else if (weatherCode >= 1 && weatherCode <= 3) {
+        body.classList.add(isDay ? 'weather-cloudy' : 'weather-night');
+    } else if ((weatherCode >= 51 && weatherCode <= 67) || (weatherCode >= 80 && weatherCode <= 82)) {
+        body.classList.add('weather-rainy');
+    } else if (weatherCode >= 95 && weatherCode <= 99) {
+        body.classList.add('weather-stormy');
+    } else if (weatherCode >= 71 && weatherCode <= 77) {
+        body.classList.add('weather-snowy');
+    }
+}
+
+// 3. مؤشر الراحة مع تفسير بلغة طبيعية
+function getComfortIndex(temp, humidity) {
+    let comfortLevel = '';
+    let description = '';
+    
+    if (temp >= 30 && humidity >= 70) {
+        comfortLevel = 'غير مريح جداً';
+        description = 'الجو حار ورطب. تجنب النشاط الخارجي المكثف';
+    } else if (temp >= 25 && humidity >= 60) {
+        comfortLevel = 'غير مريح';
+        description = 'الجو دافئ ورطب. قد تشعر بعدم الراحة';
+    } else if (temp >= 20 && temp <= 26 && humidity >= 40 && humidity <= 60) {
+        comfortLevel = 'مريح جداً';
+        description = 'ظروف مثالية للراحة والنشاط الخارجي';
+    } else if (temp <= 5) {
+        comfortLevel = 'بارد جداً';
+        description = 'الجو بارد. احرص على ارتداء ملابس دافئة';
+    } else {
+        comfortLevel = 'مقبول';
+        description = 'ظروف طبيعية ومناسبة لمعظم الأنشطة';
+    }
+    
+    return { level: comfortLevel, description: description };
+}
+
+// 4. مشاركة حالة الطقس
+function shareWeather() {
+    const location = document.getElementById('location').textContent;
+    const temp = document.getElementById('temp').textContent;
+    const condition = document.getElementById('condition').textContent;
+    
+    const shareText = `حالة الطقس في ${location}: ${temp} و ${condition}`;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: 'حالة الطقس',
+            text: shareText,
+            url: window.location.href
+        }).catch(err => {
+            console.log('Error sharing:', err);
+        });
+    } else {
+        // نسخ إلى الحافظة إذا لم يكن المشاركة مدعومة
+        navigator.clipboard.writeText(shareText).then(() => {
+            alert('تم نسخ حالة الطقس إلى الحافظة!');
+        });
+    }
+}
+
+// 5. إشعارات الصباح (إذا سمح المستخدم)
+function setupMorningNotifications() {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        // جدولة الإشعارات
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(7, 0, 0, 0); // الساعة 7 صباحاً
+        
+        const timeUntilNotification = tomorrow.getTime() - now.getTime();
+        
+        setTimeout(() => {
+            showWeatherNotification();
+        }, timeUntilNotification);
+    }
+}
+
+function showWeatherNotification() {
+    if (window.currentWeather) {
+        const notifOptions = {
+            body: `اليوم: ${window.currentWeather.temperature}° - ${window.currentWeather.weatherDescription}`,
+            icon: 'https://example.com/icon.png'
+        };
+        
+        new Notification('تقرير الطقس الصباحي', notifOptions);
+    }
+}
+
+// طلب إذن الإشعارات
+function requestNotificationPermission() {
+    if ('Notification' in window) {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                setupMorningNotifications();
+            }
+        });
+    }
+}
+
+// دالة للتحديث بعد الحصول على بيانات الطقس
+function afterWeatherDataFetched(weatherData) {
+    // التحقق من التنبيهات الجوية
+    const alerts = checkWeatherAlerts(weatherData);
+    if (alerts.length > 0) {
+        displayAlerts(alerts);
+    }
+    
+    // تحديث الخلفية
+    updateBackground(weatherData.current.weather_code, weatherData.current.is_day === 1);
+    
+    // حساب وتحديث مؤشر الراحة
+    const comfort = getComfortIndex(
+        weatherData.current.temperature_2m, 
+        weatherData.current.relative_humidity_2m
+    );
+    updateComfortIndex(comfort);
+    
+    // حفظ بيانات الطقس للإشعارات
+    window.currentWeather = formatCurrentWeather(weatherData);
+}
+
+// دالة لعرض التنبيهات
+function displayAlerts(alerts) {
+    const alertContainer = document.createElement('div');
+    alertContainer.id = 'weather-alerts';
+    alertContainer.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        z-index: 10000;
+        max-width: 500px;
+        margin: 0 auto;
+    `;
+    
+    alerts.forEach(alert => {
+        const alertEl = document.createElement('div');
+        alertEl.style.cssText = `
+            background: ${alert.severity === 'high' ? '#ff4757' : '#ffa502'};
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        `;
+        alertEl.textContent = alert.message;
+        alertContainer.appendChild(alertEl);
+    });
+    
+    document.body.appendChild(alertContainer);
+    
+    // إزالة التنبيهات بعد 10 ثوان
+    setTimeout(() => {
+        alertContainer.remove();
+    }, 10000);
+}
+
+// دالة لتحديث مؤشر الراحة في الواجهة
+function updateComfortIndex(comfort) {
+    let comfortElement = document.getElementById('comfort-index');
+    
+    if (!comfortElement) {
+        comfortElement = document.createElement('div');
+        comfortElement.id = 'comfort-index';
+        comfortElement.className = 'detail-item';
+        document.getElementById('details').appendChild(comfortElement);
+    }
+    
+    comfortElement.innerHTML = `
+        <div>مؤشر الراحة: <strong>${comfort.level}</strong></div>
+        <div style="font-size: 0.8em; opacity: 0.8;">${comfort.description}</div>
+    `;
+}
+
+// إضافة زر المشاركة
+function addShareButton() {
+    const shareBtn = document.createElement('button');
+    shareBtn.textContent = 'مشاركة الطقس';
+    shareBtn.style.cssText = `
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 10px;
+        margin: 10px auto;
+        display: block;
+        cursor: pointer;
+        font-family: 'Cairo', sans-serif;
+    `;
+    shareBtn.onclick = shareWeather;
+    
+    document.querySelector('.container').appendChild(shareBtn);
+}
+
+// إضافة زر الإشعارات
+function addNotificationButton() {
+    const notifBtn = document.createElement('button');
+    notifBtn.textContent = 'تشغيل إشعارات الطقس';
+    notifBtn.style.cssText = `
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 10px;
+        margin: 5px auto;
+        display: block;
+        cursor: pointer;
+        font-family: 'Cairo', sans-serif;
+    `;
+    notifBtn.onclick = requestNotificationPermission;
+    
+    document.querySelector('.container').appendChild(notifBtn);
+}
+
+// أنماط CSS الإضافية للخلفيات الديناميكية
+const dynamicStyles = `
+    <style>
+        .weather-sunny {
+            background: linear-gradient(to bottom, #ff9a3c, #ffc93c) !important;
+        }
+        .weather-night {
+            background: linear-gradient(to bottom, #1a1a2e, #16213e) !important;
+        }
+        .weather-cloudy {
+            background: linear-gradient(to bottom, #6a89cc, #4a69bd) !important;
+        }
+        .weather-rainy {
+            background: linear-gradient(to bottom, #4b6cb7, #182848) !important;
+        }
+        .weather-stormy {
+            background: linear-gradient(to bottom, #141E30, #243B55) !important;
+        }
+        .weather-snowy {
+            background: linear-gradient(to bottom, #8e9eab, #eef2f3) !important;
+        }
+    </style>
+`;
+
+// إضافة الأنماط إلى head
+document.head.insertAdjacentHTML('beforeend', dynamicStyles);
+
+// تعديل دالة displayWeatherData لاستدعاء الدوال الجديدة
+const originalDisplayWeatherData = window.displayWeatherData;
+window.displayWeatherData = function(weatherData, airQualityData) {
+    originalDisplayWeatherData(weatherData, airQualityData);
+    afterWeatherDataFetched(weatherData);
+};
+
+// تهيئة الميزات الإضافية عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+    // إضافة أزرار المشاركة والإشعارات
+    addShareButton();
+    addNotificationButton();
+});
+
+// إضافات أخيرة دون التأثير على الكود السابق
+// ==============================================
+
+// 1. إضافة تلميحات عند التمرير (Tooltips)
+function addTooltips() {
+    // إضافة تلميحات للعناصر
+    const elementsWithTooltips = [
+        { selector: '#theme-toggle', text: 'تبديل الوضع الليلي/النهاري' },
+        { selector: '#settings-btn', text: 'فتح الإعدادات' },
+        { selector: '#uv-index', text: 'مؤشر الأشعة فوق البنفسجية - كلما ارتفع الرقم زادت الحاجة للحماية من الشمس' },
+        { selector: '#air-quality', text: 'جودة الهواء - مؤشر على نقاء الهواء من الملوثات' }
+    ];
+    
+    elementsWithTooltips.forEach(item => {
+        const element = document.querySelector(item.selector);
+        if (element) {
+            element.setAttribute('title', item.text);
+        }
+    });
+}
+
+// 2. تحسينات الوصول accessibility
+function improveAccessibility() {
+    // إضافة علامات ARIA للعناصر
+    const ariaElements = [
+        { selector: '#theme-toggle', label: 'تبديل الوضع الليلي والنهاري' },
+        { selector: '#settings-btn', label: 'فتح إعدادات التطبيق' },
+        { selector: '#city-search', label: 'بحث عن مدينة' },
+        { selector: '#search-btn', label: 'تنفيذ البحث' }
+    ];
+    
+    ariaElements.forEach(item => {
+        const element = document.querySelector(item.selector);
+        if (element) {
+            element.setAttribute('aria-label', item.label);
+        }
+    });
+}
+
+// 3. إضافة وضع توفير البطارية
+function addBatterySaverMode() {
+    if ('getBattery' in navigator) {
+        navigator.getBattery().then(battery => {
+            if (battery.level < 0.2) {
+                // تقليل الرسوم المتحركة عند انخفاض البطارية
+                document.body.classList.add('battery-saver');
+            }
+        });
+    }
+}
+
+// 4. إضافة دعم للواقع المعزز (AR) البسيط
+function addSimpleARSupport() {
+    if ('deviceorientation' in window) {
+        window.addEventListener('deviceorientation', (e) => {
+            // تأثير بسيط عند إمالة الجهاز
+            document.querySelector('.container').style.transform = 
+                `rotate(${e.gamma * 0.1}deg)`;
+            
+            setTimeout(() => {
+                document.querySelector('.container').style.transform = 'none';
+            }, 500);
+        }, true);
+    }
+}
+
+// تهيئة جميع الإضافات
+function initializeFinalFeatures() {
+    addTooltips();
+    improveAccessibility();
+    addBatterySaverMode();
+    addSimpleARSupport();
+    
+    console.log('تم تحميل الإضافات النهائية بنجاح');
+}
+
+// استدعاء التهيئة عند تحميل الصفحة
+window.addEventListener('load', initializeFinalFeatures);
+// ==============================================
+// الميزات الاحترافية - الجزء الثالث
+// ==============================================
+
+// 1. تحسينات الأداء والتجربة
+function addPerformanceEnhancements() {
+    // التحميل المتدرج للبيانات
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                if (entry.target.id === 'weatherChart') {
+                    setTimeout(renderWeatherChart, 300);
+                }
+            }
+        });
+    }, { threshold: 0.1 });
+
+    // مراقبة العناصر
+    if (document.getElementById('weatherChart')) {
+        observer.observe(document.getElementById('weatherChart'));
+    }
+}
+
+// 2. التكاملات المتقدمة
+function addAdvancedIntegrations() {
+    // تكامل مع الأجهزة الذكية (IoT)
+    function integrateWithSmartDevices(weatherData) {
+        // منطق بسيط لتعديل الأجهزة حسب الطقس
+        const temp = weatherData.current.temperature_2m;
+        const condition = weatherData.current.weather_code;
+        
+        if (temp > 30) {
+            console.log('تشغيل مكيف الهواء تلقائياً');
+        }
+        
+        if (condition >= 51 && condition <= 67) {
+            console.log('إغلاق النوافذ تلقائياً بسبب المطر');
+        }
+    }
+
+    // دمج تحديث الاستدامة مع عرض بيانات الطقس
+    const originalDisplayWeatherData = window.displayWeatherData;
+    window.displayWeatherData = function(weatherData, airQualityData) {
+        originalDisplayWeatherData.apply(this, arguments);
+        integrateWithSmartDevices(weatherData);
+    };
+}
+
+// 3. الدعم المتعدد
+function addMultiSupportFeatures() {
+    // دعم اللغات الإضافية
+    const additionalTranslations = {
+        es: {
+            humidity: 'Humedad',
+            wind: 'Viento',
+            uvIndex: 'Índice UV',
+            airQuality: 'Calidad del aire'
+        },
+        de: {
+            humidity: 'Luftfeuchtigkeit',
+            wind: 'Wind',
+            uvIndex: 'UV-Index',
+            airQuality: 'Luftqualität'
+        }
+    };
+
+    // دعم إمكانية الوصول المتقدم
+    function setupAdvancedAccessibility() {
+        // زيادة حجم النص عند الطلب
+        const fontSizeKey = 'weatherAppFontSize';
+        const savedFontSize = localStorage.getItem(fontSizeKey);
+        if (savedFontSize) {
+            document.documentElement.style.fontSize = savedFontSize;
+        }
+
+        // إضافة اختصار لوحة المفاتيح
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === '+') {
+                increaseFontSize();
+            }
+            if (e.ctrlKey && e.key === '-') {
+                decreaseFontSize();
+            }
+        });
+
+        function increaseFontSize() {
+            const currentSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+            const newSize = Math.min(currentSize * 1.1, 20);
+            document.documentElement.style.fontSize = newSize + 'px';
+            localStorage.setItem(fontSizeKey, newSize + 'px');
+        }
+
+        function decreaseFontSize() {
+            const currentSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+            const newSize = Math.max(currentSize * 0.9, 12);
+            document.documentElement.style.fontSize = newSize + 'px';
+            localStorage.setItem(fontSizeKey, newSize + 'px');
+        }
+    }
+
+    setupAdvancedAccessibility();
+}
+
+// 4. وضع التاريخ بجانب كل يوم
+function addDatesToForecast() {
+    const originalDisplayDailyForecast = window.displayDailyForecast;
+    
+    window.displayDailyForecast = function(dailyData) {
+        const forecastContainer = document.getElementById('forecast-container');
+        forecastContainer.innerHTML = '';
+        
+        const dailyDiv = document.createElement('div');
+        dailyDiv.className = 'daily-forecast';
+        
+        for (let i = 0; i < Math.min(7, dailyData.time.length); i++) {
+            const date = new Date(dailyData.time[i]);
+            const weatherInfo = getWeatherDescription(dailyData.weather_code[i]);
+            
+            const dayItem = document.createElement('div');
+            dayItem.className = 'daily-item';
+            dayItem.innerHTML = `
+                <div class="daily-date">
+                    <div>${date.toLocaleDateString('ar-SA', { weekday: 'long' })}</div>
+                    <div class="date-number">${date.toLocaleDateString('ar-SA', { day: 'numeric', month: 'short' })}</div>
+                </div>
+                <div style="font-size: 1.5rem;">${weatherInfo.icon}</div>
+                <div class="daily-temp">
+                    <div class="temp-range">
+                        <span class="max-temp">${Math.round(dailyData.temperature_2m_max[i])}°</span>
+                        <span class="min-temp">${Math.round(dailyData.temperature_2m_min[i])}°</span>
+                    </div>
+                </div>
+            `;
+            
+            // إضافة حدث النقر لعرض التفاصيل
+            dayItem.addEventListener('click', () => {
+                showDailyDetails(dailyData, i);
+            });
+            
+            dailyDiv.appendChild(dayItem);
+        }
+        
+        forecastContainer.appendChild(dailyDiv);
+    };
+
+    // إضافة أنماط للتاريخ
+    const dateStyles = document.createElement('style');
+    dateStyles.textContent = `
+        .daily-date {
+            text-align: right;
+            min-width: 80px;
+        }
+        
+        .date-number {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+        
+        .daily-item {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .daily-item:hover {
+            background-color: rgba(255, 255, 255, 0.15) !important;
+        }
+    `;
+    document.head.appendChild(dateStyles);
+}
+
+// 5. عرض التفاصيل كاملة لكل يوم
+function showDailyDetails(dailyData, dayIndex) {
+    const date = new Date(dailyData.time[dayIndex]);
+    const weatherInfo = getWeatherDescription(dailyData.weather_code[dayIndex]);
+    
+    // إنشاء نموذج التفاصيل
+    const detailModal = document.createElement('div');
+    detailModal.className = 'detail-modal';
+    detailModal.innerHTML = `
+        <div class="detail-modal-content">
+            <h2>${date.toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
+            <div class="detail-weather-icon" style="font-size: 4rem;">${weatherInfo.icon}</div>
+            <div class="detail-weather-desc">${weatherInfo.desc}</div>
+            
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label">أعلى درجة:</span>
+                    <span class="detail-value">${Math.round(dailyData.temperature_2m_max[dayIndex])}°</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">أدنى درجة:</span>
+                    <span class="detail-value">${Math.round(dailyData.temperature_2m_min[dayIndex])}°</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">فرصة الأمطار:</span>
+                    <span class="detail-value">${dailyData.precipitation_probability_max[dayIndex] || 0}%</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">سرعة الرياح:</span>
+                    <span class="detail-value">${Math.round(dailyData.wind_speed_10m_max[dayIndex])} km/h</span>
+                </div>
+            </div>
+            
+            <button class="close-details">إغلاق</button>
+        </div>
+    `;
+    
+    document.body.appendChild(detailModal);
+    
+    // أحداث الإغلاق
+    detailModal.querySelector('.close-details').addEventListener('click', () => {
+        detailModal.remove();
+    });
+    
+    detailModal.addEventListener('click', (e) => {
+        if (e.target === detailModal) {
+            detailModal.remove();
+        }
+    });
+    
+    // إضافة أنماط النموذج
+    if (!document.getElementById('detail-modal-styles')) {
+        const modalStyles = document.createElement('style');
+        modalStyles.id = 'detail-modal-styles';
+        modalStyles.textContent = `
+            .detail-modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            }
+            
+            .detail-modal-content {
+                background: #2e2e50;
+                padding: 25px;
+                border-radius: 15px;
+                width: 90%;
+                max-width: 500px;
+                max-height: 80vh;
+                overflow-y: auto;
+                text-align: center;
+            }
+            
+            .detail-weather-icon {
+                margin: 15px 0;
+            }
+            
+            .detail-weather-desc {
+                font-size: 1.2rem;
+                margin-bottom: 20px;
+                color: #4cc9f0;
+            }
+            
+            .detail-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+                margin: 20px 0;
+            }
+            
+            .detail-item {
+                display: flex;
+                justify-content: space-between;
+                padding: 10px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+            }
+            
+            .detail-label {
+                font-weight: bold;
+            }
+            
+            .close-details {
+                background: #4cc9f0;
+                color: white;
+                border: none;
+                padding: 12px 25px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-family: 'Cairo', sans-serif;
+                margin-top: 15px;
+            }
+            
+            @media (max-width: 480px) {
+                .detail-grid {
+                    grid-template-columns: 1fr;
+                }
+                
+                .detail-modal-content {
+                    padding: 15px;
+                }
+            }
+        `;
+        document.head.appendChild(modalStyles);
+    }
+}
+
+// 7. نظام التخصيص المتقدم
+function setupAdvancedCustomization() {
+    // إضافة قسم التخصيص إلى نافذة الإعدادات
+    const settingsModal = document.getElementById('settings-modal');
+    if (settingsModal) {
+        const customizationHTML = `
+            <div class="customization-section">
+                <h3>التخصيص المتقدم</h3>
+                <div class="customization-item">
+                    <label for="primary-color">لون السمة الرئيسي:</label>
+                    <input type="color" id="primary-color" value="#4cc9f0">
+                </div>
+                <div class="customization-item">
+                    <label for="animation-intensity">كثافة الرسوم المتحركة:</label>
+                    <select id="animation-intensity">
+                        <option value="low">منخفضة</option>
+                        <option value="medium" selected>متوسطة</option>
+                        <option value="high">عالية</option>
+                    </select>
+                </div>
+            </div>
+        `;
+        
+        settingsModal.querySelector('.modal-content').insertAdjacentHTML('beforeend', customizationHTML);
+    }
+    
+    // تطبيق التخصيصات
+    function applyCustomization() {
+        const primaryColor = document.getElementById('primary-color').value;
+        const animationIntensity = document.getElementById('animation-intensity').value;
+        
+        // تطبيق اللون الأساسي
+        document.documentElement.style.setProperty('--primary-color', primaryColor);
+        
+        // تطبيق كثافة الرسوم المتحركة
+        document.body.setAttribute('data-animation-intensity', animationIntensity);
+    }
+    
+    // حفظ التخصيصات
+    function saveCustomization() {
+        const primaryColor = document.getElementById('primary-color').value;
+        const animationIntensity = document.getElementById('animation-intensity').value;
+        
+        localStorage.setItem('primaryColor', primaryColor);
+        localStorage.setItem('animationIntensity', animationIntensity);
+        
+        applyCustomization();
+    }
+    
+    // تحميل التخصيصات المحفوظة
+    function loadCustomization() {
+        const primaryColor = localStorage.getItem('primaryColor') || '#4cc9f0';
+        const animationIntensity = localStorage.getItem('animationIntensity') || 'medium';
+        
+        if (document.getElementById('primary-color')) {
+            document.getElementById('primary-color').value = primaryColor;
+            document.getElementById('animation-intensity').value = animationIntensity;
+            applyCustomization();
+        }
+    }
+    
+    // تعديل زر الحفظ لحفظ التخصيصات أيضاً
+    const originalSaveSettings = document.getElementById('save-settings').onclick;
+    document.getElementById('save-settings').onclick = function() {
+        originalSaveSettings();
+        saveCustomization();
+    };
+    
+    // تحميل التخصيصات عند البدء
+    loadCustomization();
+}
+
+// 8. نظام الاستدامة والبيئة
+function setupSustainabilityFeatures() {
+    // إضافة قسم الاستدامة
+    const sustainabilitySection = document.createElement('div');
+    sustainabilitySection.id = 'sustainability-section';
+    sustainabilitySection.innerHTML = `
+        <h3>التأثير البيئي</h3>
+        <div class="sustainability-grid">
+            <div class="sustainability-card">
+                <h4>🌞 الطاقة الشمسية المتوقعة</h4>
+                <div class="solar-energy" id="solar-energy">-- kWh/m²</div>
+            </div>
+            <div class="sustainability-card">
+                <h4>💨 إنتاج الطاقة من الرياح</h4>
+                <div class="wind-energy" id="wind-energy">--% من القدرة</div>
+            </div>
+        </div>
+    `;
+    
+    // إضافة قسم الاستدامة إلى الواجهة
+    const forecastContainer = document.getElementById('forecast-container');
+    if (forecastContainer) {
+        forecastContainer.parentNode.insertBefore(sustainabilitySection, forecastContainer.nextSibling);
+    }
+    
+    // تحديث بيانات الاستدامة
+    function updateSustainabilityData(weatherData) {
+        if (!weatherData) return;
+        
+        // حساب الطاقة الشمسية المتوقعة
+        const daylightHours = weatherData.daily.daylight_duration[0] / 3600;
+        const solarEnergy = (daylightHours * 0.7).toFixed(1);
+        if (document.getElementById('solar-energy')) {
+            document.getElementById('solar-energy').textContent = `${solarEnergy} kWh/m²`;
+        }
+        
+        // حساب كفاءة طاقة الرياح
+        const windSpeed = weatherData.current.wind_speed_10m;
+        const windEfficiency = Math.min(Math.round((windSpeed / 12) * 100), 100);
+        if (document.getElementById('wind-energy')) {
+            document.getElementById('wind-energy').textContent = `${windEfficiency}% من القدرة`;
+        }
+    }
+    
+    // دمج تحديث الاستدامة مع عرض بيانات الطقس
+    const originalDisplayWeatherData = window.displayWeatherData;
+    window.displayWeatherData = function(weatherData, airQualityData) {
+        originalDisplayWeatherData.apply(this, arguments);
+        updateSustainabilityData(weatherData);
+    };
+}
+
+// إضافة الأنماط CSS للميزات الجديدة
+const advancedFeaturesStyles = document.createElement('style');
+advancedFeaturesStyles.textContent = `    /* أنماط التخصيص */
+    .customization-section {
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+    }
+    
+    .customization-item {
+        display: flex;
+        flex-direction: column;
+        margin: 10px 0;
+    }
+    
+    .customization-item label {
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+
+    #sustainability-section {
+        margin: 25px 0;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 15px;
+    }
+    
+    .sustainability-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+        margin: 20px 0;
+    }
+    
+    .sustainability-card {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+    }
+    
+    .sustainability-card h4 {
+        margin-bottom: 10px;
+        color: var(--primary-color, #4cc9f0);
+    }
+    
+    /* أنماط كثافة الرسوم المتحركة */
+    [data-animation-intensity="low"] .weather-animation {
+        opacity: 0.3 !important;
+    }
+    
+    [data-animation-intensity="high"] .weather-animation {
+        opacity: 0.8 !important;
+    }
+    
+    /* تحسينات للشاشات الصغيرة */
+    @media (max-width: 768px) {
+        .map-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .map-controls {
+            margin-top: 10px;
+        }
+        
+        .sustainability-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+`;
+document.head.appendChild(advancedFeaturesStyles);
+
+// تهيئة جميع الميزات المتقدمة
+function initializeAdvancedFeatures() {
+    addPerformanceEnhancements();
+    addAdvancedIntegrations();
+    addMultiSupportFeatures();
+    addDatesToForecast();
+    setupInteractiveMaps();
+    setupAdvancedCustomization();
+    setupSustainabilityFeatures();
+    
+    console.log('تم تحميل الميزات المتقدمة بنجاح');
+}
+
+// استدعاء التهيئة عندما تكون الصفحة جاهزة
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeAdvancedFeatures);
+} else {
+    setTimeout(initializeAdvancedFeatures, 1000);
+}
+
+// إصلاحات وتحسينات نهائية
+// ==============================================
+
+// إصلاح مشاكل الأداء والذاكرة
+function applyFinalFixes() {
+    // منع تسرب الذاكرة
+    window.addEventListener('beforeunload', () => {
+        // تنظيف الـ event listeners
+        const allElements = document.querySelectorAll('*');
+        allElements.forEach(element => {
+            const newElement = element.cloneNode(true);
+            element.parentNode.replaceChild(newElement, element);
+        });
+    });
+    
+    // تحسين أداء الرسوم المتحركة
+    const originalDisplayWeatherData = window.displayWeatherData;
+    window.displayWeatherData = function(weatherData, airQualityData) {
+        // إيقاف الرسوم المتحركة القديمة
+        const oldAnimations = document.querySelectorAll('.weather-animation');
+        oldAnimations.forEach(animation => {
+            animation.style.animation = 'none';
+        });
+        
+        // استدعاء الدالة الأصلية
+        return originalDisplayWeatherData.apply(this, arguments);
+    };
+    
+    // تحسين أداء البحث
+    const originalSearchCity = window.searchCity;
+    window.searchCity = function() {
+        const query = document.getElementById('city-search').value.trim();
+        if (query.length < 2) {
+            document.getElementById('search-results').style.display = 'none';
+            return;
+        }
+        return originalSearchCity.apply(this, arguments);
+    };
+}
+
+// تطبيق الإصلاحات النهائية
+applyFinalFixes();
+
+// تهيئة التطبيق النهائية
+function finalInitialize() {
+    console.log('تم تحميل تطبيق الطقس بنجاح');
+    
+    // إظهار رسالة ترحيب
+    setTimeout(() => {
+        if (document.getElementById('loading').style.display !== 'none') {
+            console.log('جاري تحميل بيانات الطقس...');
+        }
+    }, 2000);
+}
+
+// الاستدعاء النهائي
+finalInitialize();
+// 8. نظام الخلفيات الطبيعية حسب حالة الطقس
+function setupWeatherBackgrounds() {
+    // خريطة خلفيات الطقس الطبيعية مع صور مناسبة لكل حالة
+    const weatherBackgrounds = {
+        0: { // صافي
+            day: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=1200&h=800&fit=crop&q=80',
+            name: 'سماء صافية'
+        },
+        1: { // غالباً صافية
+            day: 'https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=1200&h=800&fit=crop&q=80',
+            name: 'غالباً صافية'
+        },
+        2: { // جزئياً ملبدة
+            day: 'https://images.unsplash.com/photo-1542272201-b1ca555ef850?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=1200&h=800&fit=crop&q=80',
+            name: 'غائم جزئياً'
+        },
+        3: { // ملبدة بالغيوم
+            day: 'https://images.unsplash.com/photo-1562155610-e98a1ce5ca0b?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=800&fit=crop&q=80',
+            name: 'غائم'
+        },
+        45: { // ضباب
+            day: 'https://images.unsplash.com/photo-1551582045-6ec9c11d8697?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1504253163759-c23fccaebb55?w=1200&h=800&fit=crop&q=80',
+            name: 'ضباب'
+        },
+        48: { // ضباب متجمد
+            day: 'https://images.unsplash.com/photo-1516473724097-8c8d2afca597?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1551582045-6ec9c11d8697?w=1200&h=800&fit=crop&q=80',
+            name: 'ضباب متجمد'
+        },
+        51: { // رذاذ خفيف
+            day: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1433863448220-78aaa064ff47?w=1200&h=800&fit=crop&q=80',
+            name: 'رذاذ خفيف'
+        },
+        53: { // رذاذ
+            day: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1433863448220-78aaa064ff47?w=1200&h=800&fit=crop&q=80',
+            name: 'رذاذ'
+        },
+        55: { // رذاذ كثيف
+            day: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1433863448220-78aaa064ff47?w=1200&h=800&fit=crop&q=80',
+            name: 'رذاذ كثيف'
+        },
+        61: { // مطر خفيف
+            day: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1433863448220-78aaa064ff47?w=1200&h=800&fit=crop&q=80',
+            name: 'مطر خفيف'
+        },
+        63: { // مطر
+            day: 'https://images.unsplash.com/photo-1433863448220-78aaa064ff47?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?w=1200&h=800&fit=crop&q=80',
+            name: 'مطر'
+        },
+        65: { // مطر شديد
+            day: 'https://images.unsplash.com/photo-1594006387997-32c025f5cd52?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1620385019253-b051a26048ce?w=1200&h=800&fit=crop&q=80',
+            name: 'مطر شديد'
+        },
+        71: { // ثلج خفيف
+            day: 'https://images.unsplash.com/photo-1542601098-8fc114e148e2?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1519415711931-702deacf5be2?w=1200&h=800&fit=crop&q=80',
+            name: 'ثلج خفيف'
+        },
+        73: { // ثلج
+            day: 'https://images.unsplash.com/photo-1542601098-8fc114e148e2?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1519415711931-702deacf5be2?w=1200&h=800&fit=crop&q=80',
+            name: 'ثلج'
+        },
+        75: { // ثلج شديد
+            day: 'https://images.unsplash.com/photo-1519415711931-702deacf5be2?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1542601098-8fc114e148e2?w=1200&h=800&fit=crop&q=80',
+            name: 'ثلج شديد'
+        },
+        77: { // حبيبات ثلج
+            day: 'https://images.unsplash.com/photo-1519415711931-702deacf5be2?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1542601098-8fc114e148e2?w=1200&h=800&fit=crop&q=80',
+            name: 'حبيبات ثلج'
+        },
+        80: { // زخات مطر خفيفة
+            day: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1433863448220-78aaa064ff47?w=1200&h=800&fit=crop&q=80',
+            name: 'زخات مطر'
+        },
+        81: { // زخات مطر
+            day: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1433863448220-78aaa064ff47?w=1200&h=800&fit=crop&q=80',
+            name: 'زخات مطر'
+        },
+        82: { // زخات مطر شديدة
+            day: 'https://images.unsplash.com/photo-1594006387997-32c025f5cd52?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1620385019253-b051a26048ce?w=1200&h=800&fit=crop&q=80',
+            name: 'زخات مطر شديدة'
+        },
+        85: { // زخات ثلج خفيفة
+            day: 'https://images.unsplash.com/photo-1542601098-8fc114e148e2?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1519415711931-702deacf5be2?w=1200&h=800&fit=crop&q=80',
+            name: 'زخات ثلج'
+        },
+        86: { // زخات ثلج شديدة
+            day: 'https://images.unsplash.com/photo-1519415711931-702deacf5be2?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1542601098-8fc114e148e2?w=1200&h=800&fit=crop&q=80',
+            name: 'زخات ثلج شديدة'
+        },
+        95: { // عاصفة رعدية
+            day: 'https://images.unsplash.com/photo-1594006387997-32c025f5cd52?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1620385019253-b051a26048ce?w=1200&h=800&fit=crop&q=80',
+            name: 'عاصفة رعدية'
+        },
+        96: { // عاصفة رعدية مع برد
+            day: 'https://images.unsplash.com/photo-1594006387997-32c025f5cd52?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1620385019253-b051a26048ce?w=1200&h=800&fit=crop&q=80',
+            name: 'عاصفة مع برد'
+        },
+        99: { // عاصفة رعدية مع برد شديد
+            day: 'https://images.unsplash.com/photo-1594006387997-32c025f5cd52?w=1200&h=800&fit=crop&q=80',
+            night: 'https://images.unsplash.com/photo-1620385019253-b051a26048ce?w=1200&h=800&fit=crop&q=80',
+            name: 'عاصفة مع برد شديد'
+        }
+    };
+
+    // إضافة خيار الخلفيات إلى الإعدادات
+    function addBackgroundOptionToSettings() {
+        const settingsContent = document.querySelector('.modal-content');
+        if (!settingsContent) return;
+        
+        const backgroundHTML = `
+            <div class="setting-item">
+                <label>خلفية الطقس:</label>
+                <select id="background-style">
+                    <option value="auto">تلقائي (حسب حالة الطقس)</option>
+                    <option value="none">بدون خلفية</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <label>شفافية الخلفية:</label>
+                <input type="range" id="bg-opacity" min="0.1" max="1" step="0.1" value="0.8">
+                <span id="bg-opacity-value">80%</span>
+            </div>
+        `;
+        
+        // إضافة الخيار بعد خيارات اللغة
+        const languageSelect = settingsContent.querySelector('#language');
+        if (languageSelect) {
+            languageSelect.parentNode.insertAdjacentHTML('afterend', backgroundHTML);
+        }
+        
+        // تحميل الإعدادات المحفوظة
+        const savedBackgroundStyle = localStorage.getItem('backgroundStyle') || 'auto';
+        const savedBgOpacity = localStorage.getItem('bgOpacity') || '0.8';
+        
+        document.getElementById('background-style').value = savedBackgroundStyle;
+        document.getElementById('bg-opacity').value = savedBgOpacity;
+        document.getElementById('bg-opacity-value').textContent = Math.round(savedBgOpacity * 100) + '%';
+        
+        // تحديث قيمة الشفافية
+        document.getElementById('bg-opacity').addEventListener('input', function() {
+            const value = Math.round(this.value * 100);
+            document.getElementById('bg-opacity-value').textContent = value + '%';
+            updateBackgroundOpacity(this.value);
+        });
+    }
+
+    // تطبيق خلفية الطقس المناسبة
+    function applyWeatherBackground(weatherCode, isDay) {
+        const backgroundStyle = localStorage.getItem('backgroundStyle') || 'auto';
+        const bgOpacity = localStorage.getItem('bgOpacity') || '0.8';
+        
+        if (backgroundStyle === 'none') {
+            document.body.style.backgroundImage = '';
+            document.body.style.background = '#1c1c3c';
+            return;
+        }
+        
+        // استخدام خلفية حسب حالة الطقس
+        const backgroundConfig = weatherBackgrounds[weatherCode] || weatherBackgrounds[0];
+        const backgroundUrl = isDay ? backgroundConfig.day : backgroundConfig.night;
+        
+        // إنشاء عنصر الخلفية إذا لم يكن موجوداً
+        if (!document.getElementById('weather-background')) {
+            const bgElement = document.createElement('div');
+            bgElement.id = 'weather-background';
+            bgElement.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+                z-index: -2;
+                transition: background-image 1.5s ease-in-out;
+            `;
+            document.body.appendChild(bgElement);
+        }
+        
+        const bgElement = document.getElementById('weather-background');
+        bgElement.style.backgroundImage = `url(${backgroundUrl})`;
+        bgElement.style.opacity = bgOpacity;
+        
+        // إضافة overlay للتحسين القراءة
+        if (!document.getElementById('bg-overlay')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'bg-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%);
+                z-index: -1;
+                pointer-events: none;
+            `;
+            document.body.appendChild(overlay);
+        }
+        
+        // تحديث نص حالة الخلفية
+        updateBackgroundStatus(backgroundConfig.name);
+    }
+
+    // تحديث شفافية الخلفية
+    function updateBackgroundOpacity(opacity) {
+        const bgElement = document.getElementById('weather-background');
+        if (bgElement) {
+            bgElement.style.opacity = opacity;
+        }
+        localStorage.setItem('bgOpacity', opacity);
+    }
+
+    // عرض حالة الخلفية الحالية
+    function updateBackgroundStatus(weatherName) {
+        let statusElement = document.getElementById('bg-status');
+        if (!statusElement) {
+            statusElement = document.createElement('div');
+            statusElement.id = 'bg-status';
+            statusElement.style.cssText = `
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                background: rgba(0,0,0,0.7);
+                color: white;
+                padding: 5px 10px;
+                border-radius: 5px;
+                font-size: 12px;
+                z-index: 1000;
+            `;
+            document.body.appendChild(statusElement);
+        }
+        statusElement.textContent = `خلفية: ${weatherName}`;
+        
+        // إخفاء النص بعد 5 ثواني
+        setTimeout(() => {
+            statusElement.style.opacity = '0';
+            setTimeout(() => statusElement.remove(), 1000);
+        }, 5000);
+    }
+
+    // تعديل دالة عرض الطقس لتطبيق الخلفية
+    const originalDisplayWeatherData = window.displayWeatherData;
+    window.displayWeatherData = function(weatherData, airQualityData) {
+        const result = originalDisplayWeatherData.apply(this, arguments);
+        
+        if (weatherData && weatherData.current) {
+            const weatherCode = weatherData.current.weather_code;
+            const isDay = weatherData.current.is_day === 1;
+            applyWeatherBackground(weatherCode, isDay);
+        }
+        
+        return result;
+    };
+
+    // إضافة الأنماط للخلفيات
+    const backgroundStyles = document.createElement('style');
+    backgroundStyles.textContent = `
+        body {
+            background: #1c1c3c !important;
+            transition: background-color 0.5s ease;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* تحسين قابلية القراءة */
+        .light-theme .container {
+            background: rgba(255, 255, 255, 0.9) !important;
+            backdrop-filter: blur(20px);
+        }
+        
+        .detail-item, .sustainability-card, .hour, .hourly-item, .daily-item {
+            background: rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .light-theme .detail-item,
+        .light-theme .sustainability-card,
+        .light-theme .hour,
+        .light-theme .hourly-item,
+        .light-theme .daily-item {
+            background: rgba(255, 255, 255, 0.8) !important;
+        }
+    `;
+    document.head.appendChild(backgroundStyles);
+
+    // تهيئة الخلفيات
+    function initializeBackgrounds() {
+        addBackgroundOptionToSettings();
+        
+        // تطبيق الخلفية إذا كانت هناك بيانات طقس حالية
+        if (window.currentWeatherData) {
+            const weatherCode = window.currentWeatherData.current.weather_code;
+            const isDay = window.currentWeatherData.current.is_day === 1;
+            applyWeatherBackground(weatherCode, isDay);
+        }
+    }
+
+    // استدعاء التهيئة
+    initializeBackgrounds();
+}
+
+// تعديل زر الحفظ لحفظ إعدادات الخلفية
+const originalSaveSettings = document.getElementById('save-settings').onclick;
+document.getElementById('save-settings').onclick = function() {
+    const backgroundStyle = document.getElementById('background-style').value;
+    const bgOpacity = document.getElementById('bg-opacity').value;
+    
+    localStorage.setItem('backgroundStyle', backgroundStyle);
+    localStorage.setItem('bgOpacity', bgOpacity);
+    
+    // تطبيق الخلفية فوراً
+    if (window.currentWeatherData) {
+        const weatherCode = window.currentWeatherData.current.weather_code;
+        const isDay = window.currentWeatherData.current.is_day === 1;
+        applyWeatherBackground(weatherCode, isDay);
+    }
+    
+    return originalSaveSettings.apply(this, arguments);
+};
+
+// إضافة نظام الخلفيات إلى التهيئة المتقدمة
+function initializeAdvancedFeatures() {
+    // ... الكود السابق ...
+    setupWeatherBackgrounds(); // إضافة هذه السطر
+    // ... بقية الكود ...
+}
+// ==============================================
+// نظام التفاصيل الكاملة لكل يوم
+// ==============================================
+
+function setupDailyDetailsSystem() {
+    // دالة لعرض التفاصيل الكاملة لليوم
+    function showDailyDetails(dayIndex) {
+        if (!window.dailyData) return;
+        
+        const daily = window.dailyData;
+        const date = new Date(daily.time[dayIndex]);
+        const weatherCode = daily.weather_code[dayIndex];
+        const weatherInfo = getWeatherDescription(weatherCode);
+        
+        // إنشاء نموذج التفاصيل
+        const detailModal = document.createElement('div');
+        detailModal.className = 'detail-modal';
+        detailModal.innerHTML = `
+            <div class="detail-modal-content">
+                <div class="detail-header">
+                    <h2>${getFormattedDate(date)}</h2>
+                    <button class="close-details">&times;</button>
+                </div>
+                
+                <div class="detail-weather-main">
+                    <div class="detail-weather-icon" style="font-size: 4rem;">${weatherInfo.icon}</div>
+                    <div class="detail-weather-desc">${getTranslatedWeatherDescription(weatherCode)}</div>
+                    <div class="detail-temp-range">
+                        ${Math.round(daily.temperature_2m_max[dayIndex])}° / ${Math.round(daily.temperature_2m_min[dayIndex])}°
+                    </div>
+                </div>
+                
+                <div class="detail-grid">
+                    <!-- درجة الحرارة -->
+                    <div class="detail-card">
+                        <div class="detail-icon">🌡️</div>
+                        <div class="detail-info">
+                            <span class="detail-label">درجة الحرارة</span>
+                            <span class="detail-value">${Math.round(daily.temperature_2m_max[dayIndex])}° / ${Math.round(daily.temperature_2m_min[dayIndex])}°</span>
+                            <div class="detail-subtext">العظمى / الصغرى</div>
+                        </div>
+                    </div>
+                    
+                    <!-- الإحساس الحراري -->
+                    <div class="detail-card">
+                        <div class="detail-icon">🔥</div>
+                        <div class="detail-info">
+                            <span class="detail-label">الإحساس الحراري</span>
+                            <span class="detail-value">${Math.round(daily.apparent_temperature_max[dayIndex])}° / ${Math.round(daily.apparent_temperature_min[dayIndex])}°</span>
+                            <div class="detail-subtext">العظمى / الصغرى</div>
+                        </div>
+                    </div>
+                    
+                    <!-- هطول الأمطار -->
+                    <div class="detail-card">
+                        <div class="detail-icon">💧</div>
+                        <div class="detail-info">
+                            <span class="detail-label">هطول الأمطار</span>
+                            <span class="detail-value">${daily.precipitation_sum[dayIndex] || 0} ملم</span>
+                            <div class="detail-subtext">إجمالي الهطول</div>
+                        </div>
+                    </div>
+                    
+                    <!-- فرصة المطر -->
+                    <div class="detail-card">
+                        <div class="detail-icon">🌧️</div>
+                        <div class="detail-info">
+                            <span class="detail-label">فرصة المطر</span>
+                            <span class="detail-value">${daily.precipitation_probability_max[dayIndex] || 0}%</span>
+                            <div class="detail-subtext">أعلى فرصة</div>
+                        </div>
+                    </div>
+                    
+                    <!-- ساعات المطر -->
+                    <div class="detail-card">
+                        <div class="detail-icon">⏱️</div>
+                        <div class="detail-info">
+                            <span class="detail-label">ساعات المطر</span>
+                            <span class="detail-value">${daily.precipitation_hours[dayIndex] || 0} ساعة</span>
+                            <div class="detail-subtext">مدة الهطول</div>
+                        </div>
+                    </div>
+                    
+                    <!-- سرعة الرياح -->
+                    <div class="detail-card">
+                        <div class="detail-icon">💨</div>
+                        <div class="detail-info">
+                            <span class="detail-label">سرعة الرياح</span>
+                            <span class="detail-value">${Math.round(daily.wind_speed_10m_max[dayIndex])} كم/س</span>
+                            <div class="detail-subtext">أقصى سرعة</div>
+                        </div>
+                    </div>
+                    
+                    <!-- هبات الرياح -->
+                    <div class="detail-card">
+                        <div class="detail-icon">🌪️</div>
+                        <div class="detail-info">
+                            <span class="detail-label">هبات الرياح</span>
+                            <span class="detail-value">${Math.round(daily.wind_gusts_10m_max[dayIndex])} كم/س</span>
+                            <div class="detail-subtext">أقصى هبة</div>
+                        </div>
+                    </div>
+                    
+                    <!-- اتجاه الرياح -->
+                    <div class="detail-card">
+                        <div class="detail-icon">🧭</div>
+                        <div class="detail-info">
+                            <span class="detail-label">اتجاه الرياح</span>
+                            <span class="detail-value">${getWindDirection(daily.wind_direction_10m_dominant[dayIndex])}</span>
+                            <div class="detail-subtext">${daily.wind_direction_10m_dominant[dayIndex]}°</div>
+                        </div>
+                    </div>
+                    
+                    <!-- أشعة الشمس -->
+                    <div class="detail-card">
+                        <div class="detail-icon">☀️</div>
+                        <div class="detail-info">
+                            <span class="detail-label">أشعة الشمس</span>
+                            <span class="detail-value">${Math.round((daily.sunshine_duration[dayIndex] || 0) / 3600)} ساعة</span>
+                            <div class="detail-subtext">مدة الإشعاع</div>
+                        </div>
+                    </div>
+                    
+                    <!-- الأشعة فوق البنفسجية -->
+                    <div class="detail-card">
+                        <div class="detail-icon">🟣</div>
+                        <div class="detail-info">
+                            <span class="detail-label">مؤشر الأشعة</span>
+                            <span class="detail-value">${daily.uv_index_max[dayIndex] || 0}</span>
+                            <div class="detail-subtext">${getUVIndexLevel(daily.uv_index_max[dayIndex] || 0)}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- الرطوبة -->
+                    <div class="detail-card">
+                        <div class="detail-icon">💦</div>
+                        <div class="detail-info">
+                            <span class="detail-label">الرطوبة</span>
+                            <span class="detail-value">${getHumidityLevel(dailyData, dayIndex)}</span>
+                            <div class="detail-subtext">متوقع</div>
+                        </div>
+                    </div>
+                    
+                    <!-- الشروق -->
+                    <div class="detail-card">
+                        <div class="detail-icon">🌄</div>
+                        <div class="detail-info">
+                            <span class="detail-label">الشروق</span>
+                            <span class="detail-value">${formatTime(daily.sunrise[dayIndex])}</span>
+                            <div class="detail-subtext">توقيت</div>
+                        </div>
+                    </div>
+                    
+                    <!-- الغروب -->
+                    <div class="detail-card">
+                        <div class="detail-icon">🌅</div>
+                        <div class="detail-info">
+                            <span class="detail-label">الغروب</span>
+                            <span class="detail-value">${formatTime(daily.sunset[dayIndex])}</span>
+                            <div class="detail-subtext">توقيت</div>
+                        </div>
+                    </div>
+                    
+                    <!-- ساعات النهار -->
+                    <div class="detail-card">
+                        <div class="detail-icon">🕒</div>
+                        <div class="detail-info">
+                            <span class="detail-label">ساعات النهار</span>
+                            <span class="detail-value">${Math.round((daily.daylight_duration[dayIndex] || 0) / 3600)} ساعة</span>
+                            <div class="detail-subtext">مدة النهار</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- نصيحة الطقس -->
+                <div class="weather-tip">
+                    <h4>💡 نصيحة اليوم</h4>
+                    <p>${getWeatherTip(weatherCode, daily.temperature_2m_max[dayIndex], daily.precipitation_probability_max[dayIndex])}</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(detailModal);
+        
+        // أحداث الإغلاق
+        detailModal.querySelector('.close-details').addEventListener('click', () => {
+            detailModal.remove();
+        });
+        
+        detailModal.addEventListener('click', (e) => {
+            if (e.target === detailModal) {
+                detailModal.remove();
+            }
+        });
+        
+        // منع الانتشار
+        detailModal.querySelector('.detail-modal-content').addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
+
+    // دالة للحصول على اتجاه الرياح
+    function getWindDirection(degrees) {
+        const directions = [
+            'شمال', 'شمال شرق', 'شرق', 'جنوب شرق', 
+            'جنوب', 'جنوب غرب', 'غرب', 'شمال غرب'
+        ];
+        const index = Math.round(degrees / 45) % 8;
+        return directions[index] || 'غير معروف';
+    }
+
+    // دالة لمستوى الرطوبة
+    function getHumidityLevel(dailyData, dayIndex) {
+        // تقدير الرطوبة بناءً على حالة الطقس
+        const weatherCode = dailyData.weather_code[dayIndex];
+        const temp = dailyData.temperature_2m_max[dayIndex];
+        
+        if (weatherCode >= 51 && weatherCode <= 67) return 'عالية (80-100%)';
+        if (weatherCode >= 71 && weatherCode <= 77) return 'متوسطة (60-80%)';
+        if (temp > 30) return 'منخفضة (30-50%)';
+        return 'معتدلة (50-70%)';
+    }
+
+    // دالة لنصيحة الطقس
+    function getWeatherTip(weatherCode, temperature, rainChance) {
+        const tips = {
+            sunny: [
+                "يوم مشمس مثالي للأنشطة الخارجية 🌞",
+                "احمِ بشرتك من الشمس باستخدام واقي الشمس",
+                "يوم رائع للنزهات والرياضات الخارجية"
+            ],
+            cloudy: [
+                "غائم جزئياً، يوم معتدل مناسب للخروج ☁️",
+                "جو مناسب للمشي والأنشطة الخارجية",
+                "احتمال أمطار خفيفة، احمل مظلة تحسباً"
+            ],
+            rainy: [
+                "توقع أمطاراً، احمل مظلة معك 🌂",
+                "يوم ممطر، مثالي للبقاء في الداخل",
+                "قيادة آمنة، الطرق قد تكون زلقة"
+            ],
+            stormy: [
+                "تحذير: عواصف رعدية متوقعة ⚡",
+                "ابقَ في الداخل وتجنب المناطق المفتوحة",
+                "افصل الأجهزة الكهربائية تحسباً للبرق"
+            ],
+            snowy: [
+                "توقع تساقط الثلوج ❄️",
+                "البس ملابس دافئة وتجنب القيادة غير الضرورية",
+                "احترس من الطرق الزلقة"
+            ],
+            foggy: [
+                "ضباب كثيف، كن حذراً في القيادة 🚗",
+                "استخدم الأضواء الأمامية وتجنب السرعة العالية",
+                "امشِ بحذر في المناطق الضبابية"
+        ]
+        };
+
+        let tipCategory = 'sunny';
+        if (weatherCode >= 95 && weatherCode <= 99) tipCategory = 'stormy';
+        else if (weatherCode >= 71 && weatherCode <= 77) tipCategory = 'snowy';
+        else if (weatherCode >= 51 && weatherCode <= 67) tipCategory = 'rainy';
+        else if (weatherCode >= 45 && weatherCode <= 48) tipCategory = 'foggy';
+        else if (weatherCode >= 1 && weatherCode <= 3) tipCategory = 'cloudy';
+
+        const categoryTips = tips[tipCategory];
+        return categoryTips[Math.floor(Math.random() * categoryTips.length)];
+    }
+
+    // تعديل دالة عرض الأيام لإضافة حدث النقر
+    const originalDisplayDailyForecast = window.displayDailyForecast;
+    window.displayDailyForecast = function(dailyData) {
+        const result = originalDisplayDailyForecast.apply(this, arguments);
+        
+        // إضافة حدث النقر لكل يوم
+        setTimeout(() => {
+            const dailyItems = document.querySelectorAll('.daily-item');
+            dailyItems.forEach((item, index) => {
+                item.style.cursor = 'pointer';
+                item.addEventListener('click', () => {
+                    showDailyDetails(index);
+                });
+                
+                // إضافة تأثير عند التمرير
+                item.addEventListener('mouseenter', () => {
+                    item.style.transform = 'translateY(-2px)';
+                    item.style.boxShadow = '0 4px 15px rgba(76, 201, 240, 0.3)';
+                });
+                
+                item.addEventListener('mouseleave', () => {
+                    item.style.transform = 'translateY(0)';
+                    item.style.boxShadow = 'none';
+                });
+            });
+        }, 100);
+        
+        return result;
+    };
+
+    // إضافة الأنماط
+    const detailStyles = document.createElement('style');
+    detailStyles.textContent = `
+        .detail-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .detail-modal-content {
+            background: linear-gradient(135deg, #2e2e50 0%, #1c1c3c 100%);
+            padding: 30px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            border: 2px solid #4cc9f0;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(76, 201, 240, 0.3);
+        }
+        
+        .detail-header h2 {
+            color: #4cc9f0;
+            margin: 0;
+            font-size: 1.8rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .close-details {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+            padding: 5px 15px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        
+        .close-details:hover {
+            background: #4cc9f0;
+            transform: rotate(90deg);
+        }
+        
+        .detail-weather-main {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(76, 201, 240, 0.2);
+        }
+        
+        .detail-weather-desc {
+            font-size: 1.5rem;
+            color: #4cc9f0;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        
+        .detail-temp-range {
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .detail-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+            padding: 20px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(76, 201, 240, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .detail-card:hover {
+            transform: translateY(-5px);
+            background: linear-gradient(135deg, rgba(76, 201, 240, 0.2) 0%, rgba(76, 201, 240, 0.1) 100%);
+            box-shadow: 0 8px 25px rgba(76, 201, 240, 0.2);
+            border-color: #4cc9f0;
+        }
+        
+        .detail-icon {
+            font-size: 2.5rem;
+            width: 50px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .detail-info {
+            flex: 1;
+        }
+        
+        .detail-label {
+            display: block;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 8px;
+            color: #a1c6ff;
+        }
+        
+        .detail-value {
+            display: block;
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #4cc9f0;
+            margin-bottom: 5px;
+        }
+        
+        .detail-subtext {
+            display: block;
+            font-size: 0.8rem;
+            opacity: 0.6;
+            color: #fff;
+        }
+        
+        .weather-tip {
+            background: linear-gradient(135deg, rgba(76, 201, 240, 0.2) 0%, rgba(76, 201, 240, 0.1) 100%);
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 30px;
+            border-left: 4px solid #4cc9f0;
+        }
+        
+        .weather-tip h4 {
+            color: #4cc9f0;
+            margin: 0 0 10px 0;
+            font-size: 1.2rem;
+        }
+        
+        .weather-tip p {
+            margin: 0;
+            line-height: 1.6;
+            color: #fff;
+        }
+        
+        /* شريط التمرير */
+        .detail-modal-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .detail-modal-content::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        
+        .detail-modal-content::-webkit-scrollbar-thumb {
+            background: #4cc9f0;
+            border-radius: 4px;
+        }
+        
+        @media (max-width: 900px) {
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .detail-modal-content {
+                padding: 20px;
+            }
+            
+            .detail-header h2 {
+                font-size: 1.5rem;
+            }
+            
+            .detail-weather-icon {
+                font-size: 3rem;
+            }
+            
+            .detail-weather-desc {
+                font-size: 1.3rem;
+            }
+            
+            .detail-temp-range {
+                font-size: 1.7rem;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .detail-modal {
+                padding: 10px;
+            }
+            
+            .detail-modal-content {
+                padding: 15px;
+            }
+            
+            .detail-card {
+                padding: 15px;
+                gap: 15px;
+            }
+            
+            .detail-icon {
+                font-size: 2rem;
+                width: 40px;
+            }
+            
+            .detail-value {
+                font-size: 1.1rem;
+            }
+            
+            .weather-tip {
+                padding: 15px;
+            }
+        }
+        
+        @media (max-width: 400px) {
+            .detail-header h2 {
+                font-size: 1.3rem;
+            }
+            
+            .detail-weather-desc {
+                font-size: 1.1rem;
+            }
+            
+            .detail-temp-range {
+                font-size: 1.5rem;
+            }
+            
+            .detail-card {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+            }
+        }
+    `;
+    document.head.appendChild(detailStyles);
+}
+
+// ==============================================
+// تهيئة النظام
+// ==============================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    setupDailyDetailsSystem();
+});
+
+// دالة مساعدة لتنسيق التاريخ
+function getFormattedDate(date) {
+    const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    };
+    return date.toLocaleDateString('ar-SA', options);
+}
+
+// دالة مساعدة لترجمة وصف الطقس
+function getTranslatedWeatherDescription(code) {
+    const weatherMap = {
+        0: 'سماء صافية',
+        1: 'غالباً صافية',
+        2: 'جزئياً ملبدة',
+        3: 'ملبدة بالغيوم',
+        45: 'ضباب',
+        48: 'ضباب متجمد',
+        51: 'رذاذ خفيف',
+        53: 'رذاذ',
+        55: 'رذاذ كثيف',
+        61: 'مطر خفيف',
+        63: 'مطر',
+        65: 'مطر شديد',
+        71: 'ثلوج خفيفة',
+        73: 'ثلوج',
+        75: 'ثلوج شديدة',
+        80: 'زخات مطر خفيفة',
+        81: 'زخات مطر',
+        82: 'زخات مطر شديدة',
+        85: 'زخات ثلج خفيفة',
+        86: 'زخات ثلج شديدة',
+        95: 'عاصفة رعدية',
+        96: 'عاصفة رعدية مع برد',
+        99: 'عاصفة رعدية مع برد شديد'
+    };
+    return weatherMap[code] || 'غير معروف';
+}
+
+// دالة مساعدة لمستوى الأشعة فوق البنفسجية
+function getUVIndexLevel(uvIndex) {
+    if (uvIndex <= 2) return 'منخفض';
+    if (uvIndex <= 5) return 'متوسط';
+    if (uvIndex <= 7) return 'مرتفع';
+    if (uvIndex <= 10) return 'مرتفع جداً';
+    return 'خطير';
+}
+
+    </script>
+</body>
+</html>
